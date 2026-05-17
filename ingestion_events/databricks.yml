@@ -31,7 +31,7 @@ targets:
       host: https://dbc-de078d0d-b410.cloud.databricks.com
     variables:
       catalog: workspace
-      schema: ${workspace.current_user.short_name}
+      schema: default
   prod:
     mode: production
     workspace:
@@ -40,7 +40,7 @@ targets:
       root_path: /Workspace/Users/androdamous@gmail.com/.bundle/${bundle.name}/${bundle.target}
     variables:
       catalog: workspace
-      schema: prod
+      schema: default
     permissions:
       - user_name: androdamous@gmail.com
         level: CAN_MANAGE
