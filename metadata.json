@@ -1,0 +1,10 @@
+{
+    "table_name": "customer_name",
+    "description": "table depicts customer's name", 
+    "type": "delta",
+    "schema": {
+        "uid": "int",
+        "name": "str",
+        "date": "date"
+    }
+}
