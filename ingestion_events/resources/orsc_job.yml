@@ -2,17 +2,17 @@
 
 resources:
   jobs:
-    sample_job:
-      name: sample_job
+    orsc_job:
+      name: orsc_job
 
       trigger:
         # Run this job every day, exactly one day from the last run; see https://docs.databricks.com/api/workspace/jobs/create#trigger
-        periodic:
-          interval: 1
-          unit: DAYS
-        # table_update:
-        #   table_names:
-        #   - ${var.catalog}.${var.schema}.ingestion_events
+        # periodic:
+        #   interval: 1
+        #   unit: DAYS
+        table_update:
+          table_names:
+          - ${var.catalog}.${var.schema}.ingestion_events
 
       #email_notifications:
       #  on_failure:
@@ -25,15 +25,20 @@ resources:
           default: ${var.schema}
 
       tasks:
-        - task_key: notebook_task
-          notebook_task:
-            notebook_path: ../src/sample_notebook.ipynb
-        - task_key: python_wheel_task
-          depends_on:
-            - task_key: notebook_task
+        - task_key: handle_event
           python_wheel_task:
-            package_name: ingestion_events
-            entry_point: main
+            package_name: event_orchestration
+            entry_point: handler
+            parameters:
+              - "--catalog"
+              - "${var.catalog}"
+              - "--schema"
+              - "${var.schema}"
+          environment_key: default
+        - task_key: check_dependiencies
+          python_wheel_task:
+            package_name: event_orchestration
+            entry_point: check_dependiencies
             parameters:
               - "--catalog"
               - "${var.catalog}"
