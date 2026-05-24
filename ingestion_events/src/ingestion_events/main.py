@@ -25,30 +25,23 @@ def main():
     parser.add_argument("--catalog", required=True)
     parser.add_argument("--schema", required=True)
     args = parser.parse_args()
+
     catalog = args.catalog
     schema = args.schema
 
-    schema = T.StructType([
+    schema_struct = T.StructType([
         T.StructField("uid", T.IntegerType(), True),
     ])
+
     dff = spark.createDataFrame(
         generate_random_uid_df(),
-        schema
+        schema_struct
     )
 
     dff.write.format("delta").mode("append").saveAsTable(f"{catalog}.{schema}.ingestion_events")
+
     return
 
-
-
-
-
-
-    
-
-
-
-    
 
 if __name__ == "__main__":
     main()
