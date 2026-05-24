@@ -37,11 +37,11 @@ resources:
               - "--schema"
               - "${var.schema}"
           environment_key: default
-        - task_key: refresh_pipeline
-          depends_on:
-            - task_key: notebook_task
-          pipeline_task:
-            pipeline_id: ${resources.pipelines.ingestion_events_etl.id}
+        # - task_key: refresh_pipeline
+        #   depends_on:
+        #     - task_key: notebook_task
+        #   pipeline_task:
+        #     pipeline_id: ${resources.pipelines.ingestion_events_etl.id}
 
       environments:
         - environment_key: default
