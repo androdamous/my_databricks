@@ -1,5 +1,7 @@
 import argparse
 from databricks.sdk.runtime import spark
+from pyspark.sql import types as T
+
 import pandas as pd
 import numpy as np
 
@@ -26,8 +28,12 @@ def main():
     catalog = args.catalog
     schema = args.schema
 
+    schema = T.StructType([
+        T.StructField("uid", T.IntegerType(), True),
+    ])
     dff = spark.createDataFrame(
-        generate_random_uid_df()
+        generate_random_uid_df(),
+        schema
     )
 
     dff.write.format("delta").mode("append").saveAsTable(f"{catalog}.{schema}.ingestion_events")
