@@ -23,6 +23,8 @@ def main():
     parser.add_argument("--catalog", required=True)
     parser.add_argument("--schema", required=True)
     args = parser.parse_args()
+    catalog = args.catalog
+    schema = args.schema
 
     dff = spark.createDataFrame(
         generate_random_uid_df()
