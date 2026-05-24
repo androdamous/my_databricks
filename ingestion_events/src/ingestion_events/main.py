@@ -30,9 +30,7 @@ def main():
         generate_random_uid_df()
     )
 
-    df = spark.sql(f"""select * from {catalog}.{schema}.ingestion_events""")
-    df = df.union(dff)
-    df.write.format("delta").saveAsTable(f"{catalog}.{schema}.ingestion_events")
+    dff.write.format("delta").mode("append").saveAsTable(f"{catalog}.{schema}.ingestion_events")
     return
 
 
