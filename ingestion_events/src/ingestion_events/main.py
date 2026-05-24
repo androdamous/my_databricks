@@ -1,6 +1,5 @@
 import argparse
 from databricks.sdk.runtime import spark
-from ingestion_events import taxis
 import pandas as pd
 import numpy as np
 
