@@ -29,7 +29,7 @@ Run:
 ```bash
 python databricks_api.py
 ```
-
+   
 The current `__main__` block updates table properties through the Databricks SQL
 Statements API:
 

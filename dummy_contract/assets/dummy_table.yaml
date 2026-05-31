@@ -1,0 +1,16 @@
+table:
+  name: dummy
+  description: dummy table to test IaC using rest API for table creation / schema update
+  type: delta
+  source:
+    type: catalog
+    location:
+      catalog: workspace
+      schema: default      
+  columns:
+    - name: "uid"
+      description: dummy unique identifier
+      type: integer
+    - name: "date"
+      description: update date for dummy table
+      type: string
