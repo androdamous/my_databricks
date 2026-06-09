@@ -1,0 +1,12 @@
+version: 1.1
+comment: 'Dummy View'
+source: workspace.default.dummy
+fields:
+  - name: Dummy UID View
+    expr: uid
+    comment: 'dummy  UID View'
+
+measures:
+  - name: Count
+    expr: COUNT(1)
+    comment: 'Total Count'

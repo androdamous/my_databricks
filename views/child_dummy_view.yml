@@ -1,0 +1,15 @@
+version: 1.1
+
+source: workspace.default.dummy_view_as_code
+
+dimensions:
+  - name: child_uid
+    expr: source.`Dummy UID View`
+    comment: dummy unique identifier
+    display_name: Uid
+
+measures:
+  - name: count
+    expr: COUNT(*)
+    comment: Represents the total number of rows in the dataset. Use this measure to count all
+    display_name: Count
