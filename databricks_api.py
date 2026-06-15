@@ -1,4 +1,23 @@
+"""Databricks REST API helpers for Unity Catalog table management and external metadata.
+
+Covers:
+- Printing HTTP responses for debugging
+- SQL identifier and string quoting utilities
+- External metadata CRUD via the lineage-tracking API
+- Updating Unity Catalog table properties via the SQL Statements API
+
+Environment variables (loaded from .env):
+    DATABRICKS_HOST: Base URL of the Databricks workspace.
+    TOKEN: Personal access token for authentication.
+    EXTERNAL_METADATA_NAME: Name of the external metadata object.
+    EXTERNAL_METADATA_SYSTEM_TYPE: System type (e.g. "DATABRICKS").
+    EXTERNAL_METADATA_ENTITY_TYPE: Entity type (e.g. "TABLE").
+    DATABRICKS_WAREHOUSE_ID: SQL warehouse ID used to run statements.
+    DATABRICKS_TABLE_FULL_NAME: Fully qualified table name (catalog.schema.table).
+"""
+
 import os
+from typing import Any
 
 import requests
 from dotenv import load_dotenv
@@ -21,7 +40,13 @@ headers = {
 }
 
 
-def print_response(label, response):
+def print_response(label: str, response: requests.Response) -> None:
+    """Print the HTTP status code and body of a response for debugging.
+
+    Args:
+        label: A human-readable label prepended to the status line.
+        response: The HTTP response object returned by the requests library.
+    """
     print(f"{label}: {response.status_code}")
     try:
         print(response.json())
@@ -29,15 +54,44 @@ def print_response(label, response):
         print(response.text)
 
 
-def quote_identifier(identifier):
+def quote_identifier(identifier: str) -> str:
+    """Backtick-quote a dot-separated Unity Catalog identifier.
+
+    Each part is escaped so that backticks inside part names are doubled,
+    then the parts are rejoined with dots.
+
+    Args:
+        identifier: A dot-separated identifier such as "catalog.schema.table".
+
+    Returns:
+        A fully quoted identifier, e.g. "`catalog`.`schema`.`table`".
+    """
     return ".".join(f"`{part.replace('`', '``')}`" for part in identifier.split("."))
 
 
-def quote_sql_string(value):
+def quote_sql_string(value: Any) -> str:
+    """Single-quote a value for use as a SQL string literal.
+
+    Single quotes inside the value are escaped by doubling them.
+
+    Args:
+        value: The value to quote. Converted to str before quoting.
+
+    Returns:
+        A SQL-safe single-quoted string literal, e.g. "'my value'".
+    """
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def list_external_metadata():
+def list_external_metadata() -> None:
+    """List all external metadata objects registered in the workspace.
+
+    Calls GET /api/2.0/lineage-tracking/external-metadata and prints
+    the result. Raises an HTTPError if the request fails.
+
+    Raises:
+        requests.HTTPError: If the API returns a non-2xx status code.
+    """
     response = requests.get(
         f"{HOST}/api/2.0/lineage-tracking/external-metadata",
         headers=headers,
@@ -47,7 +101,16 @@ def list_external_metadata():
     response.raise_for_status()
 
 
-def create_external_metadata():
+def create_external_metadata() -> None:
+    """Create an external metadata object for lineage tracking.
+
+    Uses the values of EXTERNAL_METADATA_NAME, EXTERNAL_METADATA_SYSTEM_TYPE,
+    and EXTERNAL_METADATA_ENTITY_TYPE module-level constants. Prints the API
+    response and raises on HTTP error.
+
+    Raises:
+        requests.HTTPError: If the API returns a non-2xx status code.
+    """
     response = requests.post(
         f"{HOST}/api/2.0/lineage-tracking/external-metadata",
         headers=headers,
@@ -76,7 +139,26 @@ def create_external_metadata():
     response.raise_for_status()
 
 
-def update_table_properties_with_sql(table_full_name, properties):
+def update_table_properties_with_sql(
+    table_full_name: str,
+    properties: dict[str, str],
+) -> dict[str, Any]:
+    """Set one or more TBLPROPERTIES on a Unity Catalog table via SQL.
+
+    Builds and submits an ALTER TABLE ... SET TBLPROPERTIES statement
+    through the SQL Statements API using the configured warehouse.
+
+    Args:
+        table_full_name: Fully qualified table name (catalog.schema.table).
+        properties: Key-value pairs to set as table properties.
+
+    Returns:
+        The parsed JSON response from the SQL Statements API.
+
+    Raises:
+        ValueError: If DATABRICKS_WAREHOUSE_ID is not configured.
+        requests.HTTPError: If the API returns a non-2xx status code.
+    """
     if not SQL_WAREHOUSE_ID:
         raise ValueError("Set DATABRICKS_WAREHOUSE_ID in .env before running SQL statements.")
 

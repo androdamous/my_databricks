@@ -1,6 +1,21 @@
+"""Catalog deployment utilities for Unity Catalog tables.
+
+Provides:
+- SQL statement submission and polling via the Databricks SQL Statements API
+- YAML contract parsing for table definitions
+- DDL generation (CREATE TABLE / ALTER TABLE) from parsed contracts
+- Idempotent contract apply (create if absent, update metadata if present)
+
+Environment variables (loaded from .env):
+    TOKEN: Personal access token for authentication.
+    DATABRICKS_HOST or HOST: Base URL of the Databricks workspace.
+    DATABRICKS_WAREHOUSE_ID or WAREHOUSE_UID: SQL warehouse used to run statements.
+"""
+
 import os
 import time
 from pathlib import Path
+from typing import Any
 
 import requests
 import yaml
@@ -17,7 +32,7 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-TYPE_MAPPING = {
+TYPE_MAPPING: dict[str, str] = {
     "integer": "INT",
     "int": "INT",
     "string": "STRING",
@@ -33,7 +48,34 @@ TYPE_MAPPING = {
 }
 
 
-def send_sql_statement(sql, wait_timeout="30s", poll_interval_seconds=2, max_wait_seconds=120):
+def send_sql_statement(
+    sql: str,
+    wait_timeout: str = "30s",
+    poll_interval_seconds: int = 2,
+    max_wait_seconds: int = 120,
+) -> dict[str, Any]:
+    """Submit a SQL statement to a Databricks SQL warehouse and wait for completion.
+
+    The statement is submitted with ``on_wait_timeout=CONTINUE`` so the API
+    returns immediately if execution exceeds ``wait_timeout``. This function
+    then polls until the statement reaches a terminal state.
+
+    Args:
+        sql: The SQL statement to execute.
+        wait_timeout: Server-side timeout passed to the API (e.g. "30s").
+        poll_interval_seconds: Seconds to sleep between polling requests.
+        max_wait_seconds: Hard client-side timeout before raising TimeoutError.
+
+    Returns:
+        The final parsed JSON response from the SQL Statements API.
+
+    Raises:
+        ValueError: If HOST, WAREHOUSE_UID, or TOKEN are not configured.
+        RuntimeError: If the statement ends in FAILED, CANCELED, or CLOSED state,
+            or if the initial response does not include a statement_id.
+        TimeoutError: If the statement does not finish within ``max_wait_seconds``.
+        requests.HTTPError: If any HTTP request returns a non-2xx status code.
+    """
     if not HOST:
         raise ValueError("Set DATABRICKS_HOST or HOST in .env.")
     if not WAREHOUSE_UID:
@@ -81,7 +123,24 @@ def send_sql_statement(sql, wait_timeout="30s", poll_interval_seconds=2, max_wai
         statement_response = response.json()
 
 
-def parse_contract(contract_path="dummy_contract/assets/dummy_table.yaml"):
+def parse_contract(contract_path: str = "dummy_contract/assets/dummy_table.yaml") -> dict[str, Any]:
+    """Parse and validate a YAML table contract file.
+
+    The contract must contain a ``table`` object with at minimum:
+    - ``name``: the table name
+    - ``source.location.catalog``: target catalog
+    - ``source.location.schema``: target schema
+    - ``columns``: a non-empty list of ``{name, type}`` objects
+
+    Args:
+        contract_path: Path to the YAML contract file.
+
+    Returns:
+        The fully parsed contract as a nested dictionary.
+
+    Raises:
+        ValueError: If the contract is missing required fields or is structurally invalid.
+    """
     with Path(contract_path).open("r", encoding="utf-8") as file:
         contract = yaml.safe_load(file)
 
@@ -103,7 +162,23 @@ def parse_contract(contract_path="dummy_contract/assets/dummy_table.yaml"):
     return contract
 
 
-def to_databricks_sql_ddl(contract, mode="create"):
+def to_databricks_sql_ddl(contract: dict[str, Any], mode: str = "create") -> str | list[str]:
+    """Generate Databricks SQL DDL from a parsed table contract.
+
+    Args:
+        contract: A parsed contract dictionary as returned by :func:`parse_contract`.
+        mode: ``"create"`` to produce a ``CREATE TABLE IF NOT EXISTS`` statement
+            (returns a single string), or ``"update"`` to produce a list of
+            ``COMMENT ON TABLE`` / ``ALTER TABLE ... ALTER COLUMN ... COMMENT``
+            statements (returns a list of strings).
+
+    Returns:
+        A single DDL string when ``mode="create"``, or a list of SQL strings
+        when ``mode="update"``.
+
+    Raises:
+        ValueError: If ``mode`` is not ``"create"`` or ``"update"``.
+    """
     table = contract["table"]
     location = table["source"]["location"]
 
@@ -149,7 +224,20 @@ def to_databricks_sql_ddl(contract, mode="create"):
     raise ValueError("mode must be create or update.")
 
 
-def update_contract(contract):
+def update_contract(contract: dict[str, Any]) -> list[dict[str, Any]]:
+    """Apply a table contract to Unity Catalog idempotently.
+
+    Checks whether the target table already exists in the catalog's
+    ``information_schema``. If it does not exist, creates it with
+    :func:`to_databricks_sql_ddl` in ``"create"`` mode. If it already
+    exists, applies column and table-level comment updates in ``"update"`` mode.
+
+    Args:
+        contract: A parsed contract dictionary as returned by :func:`parse_contract`.
+
+    Returns:
+        A list of SQL statement response dictionaries from :func:`send_sql_statement`.
+    """
     table = contract["table"]
     location = table["source"]["location"]
     qid = lambda value: f"`{str(value).replace('`', '``')}`"
