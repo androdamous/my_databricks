@@ -49,6 +49,40 @@ alter table metadata.
 
 ## View Creation Guideline
 
+### Deployment Flow
+
+```mermaid
+flowchart TD
+    A["Developer writes YAML\nviews/*.yml"] --> B["python to_view_deployment.py"]
+
+    B --> C["Scan views/*.yml\n(glob all .yml files)"]
+    C --> D["multiprocessing.Pool(4)\nparallel processing"]
+
+    D --> E1["process_view_contract()\ndummy_view.yml"]
+    D --> E2["process_view_contract()\nchild_dummy_view.yml"]
+
+    E1 --> F["Read YAML content\nDerive view name from file stem"]
+    E2 --> F
+
+    F --> G["generate_view_creation_sql()\nCREATE OR REPLACE VIEW workspace.default.<name>\nWITH METRICS LANGUAGE YAML AS $$ ... $$"]
+
+    G --> H["send_sql_statement()\n(to_catalog_deployment.py)"]
+
+    ENV[".env\nDATABRICKS_HOST\nTOKEN\nDATABRICKS_WAREHOUSE_ID"] -. "loaded at startup" .-> H
+
+    H --> I["POST /api/2.0/sql/statements\n(SQL Warehouse)"]
+    I --> J["Poll GET /api/2.0/sql/statements/{id}"]
+
+    J --> K{State?}
+    K -->|SUCCEEDED| L["View created in Unity Catalog\nworkspace.default.<view_name>"]
+    K -->|PENDING/RUNNING| J
+    K -->|FAILED/CANCELED| M["Raise RuntimeError"]
+```
+
+> **Note:** All `views/*.yml` files are processed in parallel — dependency order between views is not guaranteed. Deploy dependent views (e.g. a view built on another view) in a separate step after its upstream source exists.
+
+---
+
 Metric view definitions live in `views/` as YAML files. Each file is deployed by
 `to_view_deployment.py` with this SQL shape:
 
