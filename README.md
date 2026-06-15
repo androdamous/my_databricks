@@ -52,31 +52,16 @@ alter table metadata.
 ### Deployment Flow
 
 ```mermaid
-flowchart TD
-    A["Developer writes YAML\nviews/*.yml"] --> B["python to_view_deployment.py"]
+flowchart LR
+    A["**View Definitions**\nviews/*.yml\n---\n• One YAML file per view\n• Defines dimensions & measures\n• File stem = view name"]
 
-    B --> C["Scan views/*.yml\n(glob all .yml files)"]
-    C --> D["multiprocessing.Pool(4)\nparallel processing"]
+    B["**to_view_deployment.py**\n---\n• Scans views/ for *.yml files\n• Builds CREATE OR REPLACE VIEW SQL\n• Deploys all views in parallel"]
 
-    D --> E1["process_view_contract()\ndummy_view.yml"]
-    D --> E2["process_view_contract()\nchild_dummy_view.yml"]
+    C["**to_catalog_deployment.py**\n---\n• Reads credentials from .env\n• Submits SQL to the warehouse\n• Polls until SUCCEEDED or FAILED"]
 
-    E1 --> F["Read YAML content\nDerive view name from file stem"]
-    E2 --> F
+    D["**Unity Catalog**\nDatabricks\n---\n• Executes via SQL Warehouse API\n• Registers view as metric view\n• workspace.default.<view_name>"]
 
-    F --> G["generate_view_creation_sql()\nCREATE OR REPLACE VIEW workspace.default.<name>\nWITH METRICS LANGUAGE YAML AS $$ ... $$"]
-
-    G --> H["send_sql_statement()\n(to_catalog_deployment.py)"]
-
-    ENV[".env\nDATABRICKS_HOST\nTOKEN\nDATABRICKS_WAREHOUSE_ID"] -. "loaded at startup" .-> H
-
-    H --> I["POST /api/2.0/sql/statements\n(SQL Warehouse)"]
-    I --> J["Poll GET /api/2.0/sql/statements/{id}"]
-
-    J --> K{State?}
-    K -->|SUCCEEDED| L["View created in Unity Catalog\nworkspace.default.<view_name>"]
-    K -->|PENDING/RUNNING| J
-    K -->|FAILED/CANCELED| M["Raise RuntimeError"]
+    A --> B --> C --> D
 ```
 
 > **Note:** All `views/*.yml` files are processed in parallel — dependency order between views is not guaranteed. Deploy dependent views (e.g. a view built on another view) in a separate step after its upstream source exists.
