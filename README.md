@@ -8,7 +8,7 @@ workspace.
 Install dependencies:
 
 ```bash
-pip install requests python-dotenv
+pip install requests python-dotenv PyYAML
 ```
 
 Create a local `.env` file:
@@ -46,6 +46,77 @@ update_table_properties_with_sql(table_full_name, properties)
 
 Use this for normal Unity Catalog tables where your principal has permission to
 alter table metadata.
+
+## View Creation Guideline
+
+Metric view definitions live in `views/` as YAML files. Each file is deployed by
+`to_view_deployment.py` with this SQL shape:
+
+```sql
+CREATE OR REPLACE VIEW <catalog>.<schema>.<view_name>
+WITH METRICS LANGUAGE YAML AS
+$$
+<yaml view definition>
+$$
+```
+
+Create one file per view:
+
+```text
+views/<view_name>.yml
+```
+
+The current script uses the file stem as the view name and deploys it to
+`workspace.default`. For example, `views/dummy_view.yml` becomes
+`workspace.default.dummy_view`.
+
+Recommended YAML structure:
+
+```yaml
+version: 1.1
+comment: Short view description
+source: workspace.default.source_table_or_view
+
+dimensions:
+  - name: dimension_name
+    expr: source.column_name
+    comment: Dimension description
+    display_name: Dimension Name
+
+measures:
+  - name: row_count
+    expr: COUNT(*)
+    comment: Total rows
+    display_name: Row Count
+```
+
+Guidelines:
+
+- Use lower snake case for file names, view names, dimensions, and measures.
+- Set `source` to a fully qualified Unity Catalog table or view.
+- Keep SQL expressions in `expr` fields deterministic and scoped to the source.
+- When referencing a source column with spaces or special characters, use
+  backticks, for example:
+
+  ```yaml
+  expr: source.`Column Name`
+  ```
+
+- Do not include the `CREATE VIEW` SQL wrapper inside the YAML file; the script
+  adds it during deployment.
+- Keep dependent views in a separate deployment step unless their upstream
+  sources already exist. The script processes all `views/*.yml` files in
+  parallel, so dependency order is not guaranteed.
+
+Deploy all view definitions:
+
+```bash
+python to_view_deployment.py
+```
+
+Before running, make sure `.env` contains `TOKEN`, `DATABRICKS_HOST`, and
+`DATABRICKS_WAREHOUSE_ID`. Use a SQL warehouse and principal with permission to
+create or replace views in the target catalog and schema.
 
 ## External Metadata API
 

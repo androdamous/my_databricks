@@ -1,0 +1,25 @@
+# Required dependencies for /Users/nduc4nh/Works/Learning/my_databricks
+# Generated from pyproject.toml and imported third-party modules in the codebase.
+
+# Core/runtime dependencies
+requests
+python-dotenv
+PyYAML
+numpy
+pandas
+pyspark
+
+# Databricks dependencies
+databricks-sdk
+databricks-connect>=15.4,<15.5
+databricks-dlt
+
+# Development and testing
+pytest
+ruff
+ipykernel
+
+# Notes
+# - Python version declared in ingestion_events/pyproject.toml: >=3.10,<3.13
+# - 'hatchling' is used as the build backend if packaging this project.
+# - If you want a pip-installable file, rename this to requirements.txt or I can generate a stricter pinned version.
