@@ -11,6 +11,10 @@ table:
     - name: "uid"
       description: dummy unique identifier
       type: integer
+      tags:
+        sensitivity: "pii"
     - name: "date"
       description: update date for dummy table
       type: string
+      tags:
+        sensitivity: "internal"

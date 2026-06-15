@@ -1,0 +1,15 @@
+policies:
+  - name: 'mask_pii_data'
+    description: 'This policy allows read access to the dummy view for all users.'
+    type: 'column_mask'
+    on_securable_object:
+      type: 'schema'
+      name: 'workspace.default'
+    to_principals:
+      - name: "externals"
+    function: "labelling"
+    conditions:
+      - tag_key: "sensitivity"
+        tag_value: "pii"
+        alias: "sensitive_data"
+

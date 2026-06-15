@@ -26,7 +26,8 @@ load_dotenv(".env")
 
 TOKEN = os.environ.get("TOKEN", "")
 HOST = os.environ.get("DATABRICKS_HOST") or os.environ.get("HOST", "")
-WAREHOUSE_UID = os.environ.get("DATABRICKS_WAREHOUSE_ID") or os.environ.get("WAREHOUSE_UID", "")
+WAREHOUSE_UID = os.environ.get(
+    "DATABRICKS_WAREHOUSE_ID") or os.environ.get("WAREHOUSE_UID", "")
 HEADERS = {
     "Authorization": f"Bearer {TOKEN}",
     "Content-Type": "application/json",
@@ -79,7 +80,8 @@ def send_sql_statement(
     if not HOST:
         raise ValueError("Set DATABRICKS_HOST or HOST in .env.")
     if not WAREHOUSE_UID:
-        raise ValueError("Set DATABRICKS_WAREHOUSE_ID or WAREHOUSE_UID in .env.")
+        raise ValueError(
+            "Set DATABRICKS_WAREHOUSE_ID or WAREHOUSE_UID in .env.")
     if not TOKEN:
         raise ValueError("Set TOKEN in .env.")
 
@@ -107,11 +109,14 @@ def send_sql_statement(
             return statement_response
         if state in {"FAILED", "CANCELED", "CLOSED"}:
             error = status.get("error", {})
-            raise RuntimeError(error.get("message") or f"SQL statement ended with state {state}.")
+            raise RuntimeError(error.get("message")
+                               or f"SQL statement ended with state {state}.")
         if not statement_id:
-            raise RuntimeError(f"SQL response did not include statement_id: {statement_response}")
+            raise RuntimeError(
+                f"SQL response did not include statement_id: {statement_response}")
         if time.monotonic() - started_at > max_wait_seconds:
-            raise TimeoutError(f"SQL statement {statement_id} did not finish within {max_wait_seconds}s.")
+            raise TimeoutError(
+                f"SQL statement {statement_id} did not finish within {max_wait_seconds}s.")
 
         time.sleep(poll_interval_seconds)
         response = requests.get(
@@ -182,9 +187,10 @@ def to_databricks_sql_ddl(contract: dict[str, Any], mode: str = "create") -> str
     table = contract["table"]
     location = table["source"]["location"]
 
-    qid = lambda value: f"`{str(value).replace('`', '``')}`"
-    qstr = lambda value: "'" + str(value).replace("'", "''") + "'"
-    dtype = lambda value: TYPE_MAPPING.get(str(value).lower(), str(value).upper())
+    def qid(value): return f"`{str(value).replace('`', '``')}`"
+    def qstr(value): return "'" + str(value).replace("'", "''") + "'"
+    def dtype(value): return TYPE_MAPPING.get(
+        str(value).lower(), str(value).upper())
 
     full_table_name = ".".join(
         [qid(location["catalog"]), qid(location["schema"]), qid(table["name"])]
@@ -211,7 +217,8 @@ def to_databricks_sql_ddl(contract: dict[str, Any], mode: str = "create") -> str
     if mode == "update":
         statements = []
         if table.get("description"):
-            statements.append(f"COMMENT ON TABLE {full_table_name} IS {qstr(table['description'])}")
+            statements.append(
+                f"COMMENT ON TABLE {full_table_name} IS {qstr(table['description'])}")
 
         for column in table["columns"]:
             if column.get("description"):
@@ -219,6 +226,13 @@ def to_databricks_sql_ddl(contract: dict[str, Any], mode: str = "create") -> str
                     f"ALTER TABLE {full_table_name} ALTER COLUMN {qid(column['name'])} "
                     f"COMMENT {qstr(column['description'])}"
                 )
+            if column.get("tags"):
+                statements.append(
+                    f"ALTER TABLE {full_table_name} ALTER COLUMN {qid(column['name'])} "
+                    f"SET TAGS ({"".join([f"{qstr(tag_key)} = {qstr(tag_value)}" for tag_key,
+                                          tag_value in column.get("tags").items()])})"
+                )
+
         return statements
 
     raise ValueError("mode must be create or update.")
@@ -240,8 +254,8 @@ def update_contract(contract: dict[str, Any]) -> list[dict[str, Any]]:
     """
     table = contract["table"]
     location = table["source"]["location"]
-    qid = lambda value: f"`{str(value).replace('`', '``')}`"
-    qstr = lambda value: "'" + str(value).replace("'", "''") + "'"
+    def qid(value): return f"`{str(value).replace('`', '``')}`"
+    def qstr(value): return "'" + str(value).replace("'", "''") + "'"
 
     table_exists_sql = f"""
         SELECT 1
@@ -264,3 +278,5 @@ def update_contract(contract: dict[str, Any]) -> list[dict[str, Any]]:
 
 if __name__ == "__main__":
     update_contract(parse_contract())
+    # contract = parse_contract()
+    # print(to_databricks_sql_ddl(contract, mode="update"))
